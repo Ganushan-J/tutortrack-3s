@@ -1,10 +1,19 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+import { AppShell } from '@/components/app-shell'
+import { TutorStoreProvider } from '@/lib/tutor-store'
 import './globals.css'
 
+const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
+const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
+
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: {
+    default: 'TutorTrack',
+    template: '%s · TutorTrack',
+  },
+  description: 'Manage GCSE maths tutoring students, lessons, notes and progress.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -26,11 +35,10 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  colorScheme: 'dark',
+  themeColor: '#1c1d21',
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default function RootLayout({
@@ -39,9 +47,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en-GB" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="antialiased">
-        {children}
+        <TutorStoreProvider>
+          <AppShell>{children}</AppShell>
+        </TutorStoreProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
