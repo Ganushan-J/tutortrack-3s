@@ -98,9 +98,39 @@ def test_owner_scoping_hides_other_tutor_records(db_client):
     )
 
     from app import create_app
+    from tests.conftest import AuthClient
 
-    other = create_app({"TESTING": True, "TUTOR_ID": "tut_other"}).test_client()
+    other_app = create_app({"TESTING": True, "SECRET_KEY": "test-only-key-long-enough-for-sessions", "SESSION_COOKIE_SECURE": False})
+    other_app.test_client_class = AuthClient
+    other = other_app.test_client()
+    login = other.post("/api/auth/login", json={"email": "other@example.test", "password": "other-password-123"})
+    assert login.status_code == 200
+    other.csrf_token = login.get_json()["csrfToken"]
     assert other.get(f"/api/students/{student_id}").status_code == 404
     assert other.get(f"/api/lessons/{lesson_id}").status_code == 404
     assert other.get("/api/students").get_json()["students"] == []
     assert other.patch(f"/api/students/{student_id}", json={"targetGrade": 4}).status_code == 404
+
+
+def test_unauthenticated_requests_are_blocked(app):
+    anonymous = app.test_client()
+    assert anonymous.get("/api/health").status_code == 200
+    assert anonymous.get("/api/students").status_code == 401
+    assert anonymous.get("/api/lessons").status_code == 401
+    assert anonymous.post("/api/students", json=valid_student()).status_code == 401
+    assert anonymous.get("/api/auth/me").status_code == 401
+
+
+def test_csrf_and_sign_out(client):
+    assert client.get("/api/auth/me").get_json()["user"]["id"] == "tut_local"
+    assert client.post("/api/students", json=valid_student(), headers={"X-CSRF-Token": "wrong"}).status_code == 403
+    assert client.post("/api/auth/logout").status_code == 200
+    assert client.get("/api/students").status_code == 401
+
+
+def test_bad_login_does_not_create_session(db_client):
+    from app import create_app
+
+    anonymous = create_app({"TESTING": True, "SECRET_KEY": "test-only-key-long-enough-for-sessions", "SESSION_COOKIE_SECURE": False}).test_client()
+    assert anonymous.post("/api/auth/login", json={"email": "local@example.test", "password": "wrong"}).status_code == 401
+    assert anonymous.get("/api/students").status_code == 401
