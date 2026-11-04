@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { FormField, NativeSelect, SegmentedControl } from '@/components/form-controls'
+import { ApiError } from '@/lib/api'
 import { GCSE_TOPICS } from '@/lib/sample-data'
 import { useTutorStore } from '@/lib/tutor-store'
 import { EXAM_BOARDS, TIERS, YEAR_GROUPS, type ExamBoard, type Grade, type Tier, type YearGroup } from '@/lib/types'
@@ -26,6 +27,7 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
   const [goals, setGoals] = useState('')
   const [nextTopic, setNextTopic] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
 
   const grades = ALL_GRADES.filter((g) => g <= maxGradeForTier(tier))
 
@@ -36,7 +38,7 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
     if (targetGrade > max) setTargetGrade(max)
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const nextErrors: Record<string, string> = {}
     if (!firstName.trim()) nextErrors.firstName = 'First name is required'
@@ -44,21 +46,32 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    const student = addStudent({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      yearGroup,
-      examBoard,
-      tier,
-      currentGrade,
-      targetGrade,
-      learningGoals: goals
-        .split('\n')
-        .map((g) => g.trim())
-        .filter(Boolean),
-      nextTopic: nextTopic.trim(),
-    })
-    router.push(`/students/${student.id}`)
+    setSaving(true)
+    try {
+      const student = await addStudent({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        yearGroup,
+        examBoard,
+        tier,
+        currentGrade,
+        targetGrade,
+        learningGoals: goals
+          .split('\n')
+          .map((g) => g.trim())
+          .filter(Boolean),
+        nextTopic: nextTopic.trim(),
+      })
+      router.push(`/students/${student.id}`)
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setErrors({ form: error.message, ...error.errors })
+      } else {
+        setErrors({ form: 'Could not save this student. Try again.' })
+      }
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -73,6 +86,11 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
           Add student
         </h2>
         <p className="text-xs text-muted-foreground">You can edit goals and topics later from their profile.</p>
+        {errors.form ? (
+          <p className="mt-2 text-xs text-destructive" role="alert">
+            {errors.form}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-5 px-4 py-5 md:grid-cols-2 md:px-5 lg:grid-cols-4">
@@ -176,7 +194,9 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit">Save student</Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save student'}
+        </Button>
       </div>
     </form>
   )
