@@ -43,7 +43,7 @@ export function LessonForm({ lessonId, defaultStudentId }: Props) {
 
 function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; defaultStudentId?: string }) {
   const router = useRouter()
-  const { students, today, getStudent, addLesson, updateLesson, updateStudent } = useTutorStore()
+  const { students, resources, today, getStudent, addLesson, updateLesson, updateStudent } = useTutorStore()
   const sortedStudents = [...students].sort((a, b) => fullName(a).localeCompare(fullName(b)))
 
   const initialStudentId =
@@ -59,6 +59,8 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
   const [difficulties, setDifficulties] = useState(existing?.difficulties ?? '')
   const [homework, setHomework] = useState(existing?.homework ?? '')
   const [links, setLinks] = useState<string[]>(existing?.resourceLinks ?? [])
+  const [resourceIds, setResourceIds] = useState<string[]>(existing?.resourceIds ?? [])
+  const [resourceSearch, setResourceSearch] = useState('')
   const [nextPlan, setNextPlan] = useState(existing?.nextLessonPlan ?? '')
   const [nextTopic, setNextTopic] = useState(getStudent(initialStudentId)?.nextTopic ?? '')
   const [error, setError] = useState('')
@@ -97,6 +99,7 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
       difficulties: difficulties.trim(),
       homework: homework.trim(),
       resourceLinks: links,
+      resourceIds,
       nextLessonPlan: nextPlan.trim(),
     }
     setSaving(true)
@@ -115,7 +118,9 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
       router.push('/students/' + studentId)
     } catch (cause) {
       if (cause instanceof ApiError) setError(cause.errors.studentId ?? '')
-      const message = cause instanceof Error ? cause.message : 'Please try again.'
+      const message = cause instanceof ApiError && cause.errors.resourceIds
+        ? cause.errors.resourceIds
+        : cause instanceof Error ? cause.message : 'Please try again.'
       setFormError(lessonWasSaved ? 'Lesson saved, but the next topic did not update. Save again to retry. ' + message : message)
     } finally {
       setSaving(false)
@@ -241,6 +246,23 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
 
             <FormSection title="Resource links" description="Worksheets, past papers or videos shared">
               <ResourceLinksInput links={links} onChange={setLinks} />
+            </FormSection>
+
+            <FormSection title="Saved resources" description="Attach links from your reusable resource library">
+              <div className="space-y-3 p-4">
+                <Input aria-label="Search saved resources" placeholder="Search title or topic" value={resourceSearch} onChange={(event) => setResourceSearch(event.target.value)} />
+                {resources.length === 0 ? <p className="text-sm text-muted-foreground">No saved resources yet.</p> : (
+                  <div className="max-h-48 space-y-2 overflow-y-auto">
+                    {resources.filter((resource) => `${resource.title} ${resource.topic}`.toLowerCase().includes(resourceSearch.trim().toLowerCase())).map((resource) => (
+                      <label key={resource.id} className="flex cursor-pointer items-center gap-3 rounded-md border border-border p-2 text-sm">
+                        <input type="checkbox" checked={resourceIds.includes(resource.id)} onChange={(event) => setResourceIds((previous) => event.target.checked ? [...previous, resource.id] : previous.filter((id) => id !== resource.id))} />
+                        <span>{resource.title} <span className="text-xs text-muted-foreground">· {resource.topic} · {resource.tier}</span></span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">{resourceIds.length} selected · <Link href="/resources" className="text-primary hover:underline">Manage resource library</Link></p>
+              </div>
             </FormSection>
           </>
         )}
