@@ -16,8 +16,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files (keep committed examples)
 .env*
+!.env.example
+!**/.env.example
+
+# python
+__pycache__/
+*.py[cod]
+backend/.venv/
+.pytest_cache/
 
 # vercel
 .vercel
