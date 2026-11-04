@@ -35,8 +35,8 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 python migrate.py
 python setup_tutor.py
-python app.py
 pytest
+python app.py
 ```
 
 Run `python setup_tutor.py` once to enter your email and a password locally (the password input is hidden). To deliberately replace it later, use `python setup_tutor.py --reset`. Open [http://127.0.0.1:5000/api/health](http://127.0.0.1:5000/api/health) to confirm Flask is running, then [http://localhost:3000](http://localhost:3000) to sign in. A direct unauthenticated API request to `/api/students` must return `401`.
