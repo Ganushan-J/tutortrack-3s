@@ -8,16 +8,11 @@ from pathlib import Path
 
 import psycopg
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
-from flask_cors import CORS
+from flask import Flask, g, jsonify, request
 from psycopg.types.json import Json
 
-from db import (
-    current_tutor_id,
-    get_connection,
-    lesson_json,
-    student_json,
-)
+from auth import configure_auth
+from db import get_connection, lesson_json, student_json
 from validation import validate_lesson, validate_student
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
@@ -61,25 +56,20 @@ LESSON_SELECT = """
 
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__)
-    app.config["TUTOR_ID"] = current_tutor_id(test_config)
+    configure_auth(app)
     if test_config:
         app.config.update(test_config)
-
-    CORS(
-        app,
-        origins=[
-            origin.strip()
-            for origin in os.getenv(
-                "CORS_ORIGINS",
-                "http://localhost:3000,http://127.0.0.1:3000",
-            ).split(",")
-            if origin.strip()
-        ],
-    )
 
     @app.errorhandler(RuntimeError)
     def handle_config_error(error):
         return jsonify({"error": str(error)}), 503
+
+    @app.after_request
+    def prevent_api_caching(response):
+        if request.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @app.errorhandler(psycopg.Error)
     def handle_db_error(_error):
@@ -90,7 +80,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         ), 503
 
     def tutor_id() -> str:
-        return app.config["TUTOR_ID"]
+        return g.tutor_id
 
     def json_error(message: str, status: int, errors: dict | None = None):
         payload = {"error": message}
