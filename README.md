@@ -14,6 +14,8 @@ The UI is Next.js. The JSON API is Flask in `backend/`; Flask is the only proces
 
 Canonical API prefix: `/api`. Work package 1 covers students and lessons (create/list/get/update, plus student archive/restore). Authentication is a later package; until then every query is scoped to `TUTOR_ID` from the server environment (`tut_local` after migrate).
 
+The Vercel preview for this branch builds the Next.js UI only; it does not host Flask. Deploy the Flask API separately in the release package and configure the UI to reach it. Use fictional student records while the API has no tutor login (work package 3).
+
 JSON arrays (`learningGoals`, `topicsCovered`, `resourceLinks`) are stored as JSONB. Lesson `date` / `startTime` are Europe/London civil values; `created_at` / `updated_at` / `archived_at` are UTC.
 
 Frontend (terminal 1):
