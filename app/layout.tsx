@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { AppShell } from '@/components/app-shell'
 import { TutorStoreProvider } from '@/lib/tutor-store'
+import { AuthGate, AuthProvider } from '@/lib/auth-context'
 import './globals.css'
 
 const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
@@ -49,9 +50,13 @@ export default function RootLayout({
   return (
     <html lang="en-GB" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="antialiased">
-        <TutorStoreProvider>
-          <AppShell>{children}</AppShell>
-        </TutorStoreProvider>
+        <AuthProvider>
+          <AuthGate>
+            <TutorStoreProvider>
+              <AppShell>{children}</AppShell>
+            </TutorStoreProvider>
+          </AuthGate>
+        </AuthProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

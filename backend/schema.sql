@@ -13,8 +13,13 @@
 CREATE TABLE IF NOT EXISTS tutors (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
+    password_hash TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Existing WP1 databases already have the tutors table. This additive
+-- migration preserves their students and lessons.
+ALTER TABLE tutors ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
 CREATE TABLE IF NOT EXISTS students (
     id TEXT PRIMARY KEY,
