@@ -8,9 +8,10 @@ import { formatRelativeDay, formatTimeRange } from '@/lib/dates'
 import { compareLessonsAsc, compareLessonsDesc, fullName, isUpcoming } from '@/lib/lessons'
 import { useTutorStore } from '@/lib/tutor-store'
 import { LessonHistory } from './lesson-history'
+import { TopicProgress } from './topic-progress'
 
 export function StudentProfile({ studentId }: { studentId: string }) {
-  const { getStudent, lessons, today, loading, loadError } = useTutorStore()
+  const { getStudent, lessons, resources, today, loading, loadError } = useTutorStore()
   const student = getStudent(studentId)
 
   if (loading || loadError) return null
@@ -119,9 +120,10 @@ export function StudentProfile({ studentId }: { studentId: string }) {
               </ol>
             )}
           </SectionCard>
+          <TopicProgress studentId={student.id} nextTopic={student.nextTopic} today={today} lessons={studentLessons} />
         </div>
 
-        <LessonHistory className="lg:col-span-2" lessons={history} today={today} />
+        <LessonHistory className="lg:col-span-2" lessons={history} today={today} resources={resources} />
       </div>
     </>
   )
