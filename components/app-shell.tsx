@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, NotebookPen, Sigma, Users } from 'lucide-react'
+import { LayoutDashboard, LogOut, NotebookPen, Sigma, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTutorStore } from '@/lib/tutor-store'
+import { useAuth } from '@/lib/auth-context'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -32,6 +33,7 @@ function Logo() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { loading, loadError, reload } = useTutorStore()
+  const { user, error: authError, logout } = useAuth()
 
   return (
     <div className="flex min-h-dvh">
@@ -58,19 +60,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )
           })}
         </nav>
-        <p className="mt-auto px-3 text-xs leading-relaxed text-muted-foreground">
-          GCSE Maths · TutorTrack
-        </p>
+        <div className="mt-auto space-y-3 px-3 text-xs text-muted-foreground">
+          <p className="truncate" title={user?.email}>{user?.email}</p>
+          <button type="button" onClick={() => void logout()} className="flex items-center gap-2 text-sm hover:text-foreground">
+            <LogOut className="size-4" aria-hidden="true" /> Sign out
+          </button>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-14 items-center border-b border-border bg-background/90 px-4 backdrop-blur md:hidden">
           <Logo />
+          <button type="button" onClick={() => void logout()} aria-label="Sign out" className="ml-auto rounded-md p-2 text-muted-foreground hover:text-foreground">
+            <LogOut className="size-5" aria-hidden="true" />
+          </button>
         </header>
 
         <main className="flex-1 px-4 pt-6 pb-28 sm:px-6 md:px-8 md:pt-8 md:pb-12">
           <div className="mx-auto w-full max-w-6xl">
             {loading && <p role="status" className="mb-4 text-sm text-muted-foreground">Loading students and lessons…</p>}
+            {authError && <p role="alert" className="mb-4 text-sm text-destructive">{authError}</p>}
             {loadError && (
               <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-card p-3 text-sm">
                 <span>Could not load your data: {loadError}</span>
