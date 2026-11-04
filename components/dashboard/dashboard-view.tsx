@@ -13,7 +13,9 @@ import { StatCard } from './stat-card'
 import { UpcomingLessons } from './upcoming-lessons'
 
 export function DashboardView() {
-  const { today, students, lessons } = useTutorStore()
+  const { today, students, lessons, loading, loadError } = useTutorStore()
+
+  if (loading || loadError) return null
 
   const upcoming = lessons.filter((l) => isUpcoming(l, today)).sort(compareLessonsAsc)
   const todayCount = upcoming.filter((l) => l.date === today).length
