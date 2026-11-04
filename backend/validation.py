@@ -228,6 +228,18 @@ def validate_lesson(body, *, partial: bool = False) -> tuple[dict | None, dict[s
                 break
         data["resource_links"] = links
 
+    if not partial or "resourceIds" in body:
+        resource_ids = body.get("resourceIds", [])
+        if not isinstance(resource_ids, list) or any(
+            not isinstance(item, str) or not item.startswith("res_") or len(item) > 64
+            for item in resource_ids
+        ):
+            errors["resourceIds"] = "Choose valid saved resources"
+        elif len(resource_ids) > MAX_LINKS or len(set(resource_ids)) != len(resource_ids):
+            errors["resourceIds"] = f"Choose at most {MAX_LINKS} distinct resources"
+        else:
+            data["resource_ids"] = resource_ids
+
     if errors:
         return None, errors
     return data, {}
