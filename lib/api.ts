@@ -1,4 +1,4 @@
-import type { Lesson, LessonInput, NewStudent, Student } from './types'
+import type { Lesson, LessonInput, NewStudent, Student, TopicObservation, ObservationInput, SavedResource, ResourceInput } from './types'
 
 // Next.js forwards same-origin /api requests to Flask so the session cookie
 // belongs to the UI origin. No database credentials or Flask URL reach JS.
@@ -98,4 +98,28 @@ export async function createLesson(input: LessonInput): Promise<Lesson> {
 
 export async function updateLesson(id: string, changes: Partial<LessonInput>): Promise<Lesson> {
   return (await request<{ lesson: Lesson }>('/api/lessons/' + encodeURIComponent(id), json('PATCH', changes))).lesson
+}
+
+export async function fetchProgress(studentId: string): Promise<TopicObservation[]> {
+  return (await request<{ observations: TopicObservation[] }>('/api/students/' + encodeURIComponent(studentId) + '/progress')).observations
+}
+
+export async function createProgress(studentId: string, input: ObservationInput): Promise<TopicObservation> {
+  return (await request<{ observation: TopicObservation }>('/api/students/' + encodeURIComponent(studentId) + '/progress', json('POST', input))).observation
+}
+
+export async function updateProgress(id: string, changes: Partial<ObservationInput>): Promise<TopicObservation> {
+  return (await request<{ observation: TopicObservation }>('/api/progress/' + encodeURIComponent(id), json('PATCH', changes))).observation
+}
+
+export async function fetchResources(): Promise<SavedResource[]> {
+  return (await request<{ resources: SavedResource[] }>('/api/resources')).resources
+}
+
+export async function createResource(input: ResourceInput): Promise<SavedResource> {
+  return (await request<{ resource: SavedResource }>('/api/resources', json('POST', input))).resource
+}
+
+export async function updateResource(id: string, changes: Partial<ResourceInput>): Promise<SavedResource> {
+  return (await request<{ resource: SavedResource }>('/api/resources/' + encodeURIComponent(id), json('PATCH', changes))).resource
 }

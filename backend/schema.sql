@@ -73,6 +73,55 @@ CREATE INDEX IF NOT EXISTS lessons_tutor_date_idx
 CREATE INDEX IF NOT EXISTS lessons_student_date_idx
     ON lessons (student_id, date);
 
+-- Composite unique indexes support owner-preserving foreign keys below.
+CREATE UNIQUE INDEX IF NOT EXISTS students_id_tutor_idx ON students (id, tutor_id);
+CREATE UNIQUE INDEX IF NOT EXISTS lessons_id_tutor_idx ON lessons (id, tutor_id);
+CREATE UNIQUE INDEX IF NOT EXISTS lessons_id_tutor_student_idx ON lessons (id, tutor_id, student_id);
+
+CREATE TABLE IF NOT EXISTS topic_observations (
+    id TEXT PRIMARY KEY,
+    tutor_id TEXT NOT NULL REFERENCES tutors (id),
+    student_id TEXT NOT NULL,
+    lesson_id TEXT,
+    topic TEXT NOT NULL CHECK (length(topic) BETWEEN 1 AND 120),
+    status TEXT NOT NULL CHECK (status IN ('needs_support', 'developing', 'independent')),
+    observed_on DATE NOT NULL,
+    evidence TEXT NOT NULL DEFAULT '' CHECK (length(evidence) <= 2000),
+    next_action TEXT NOT NULL DEFAULT '' CHECK (length(next_action) <= 2000),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    FOREIGN KEY (student_id, tutor_id) REFERENCES students (id, tutor_id),
+    FOREIGN KEY (lesson_id, tutor_id, student_id) REFERENCES lessons (id, tutor_id, student_id)
+);
+
+CREATE INDEX IF NOT EXISTS observations_student_date_idx
+    ON topic_observations (tutor_id, student_id, observed_on DESC, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS resources (
+    id TEXT PRIMARY KEY,
+    tutor_id TEXT NOT NULL REFERENCES tutors (id),
+    title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 160),
+    url TEXT NOT NULL CHECK (length(url) BETWEEN 1 AND 500),
+    topic TEXT NOT NULL CHECK (length(topic) BETWEEN 1 AND 120),
+    tier TEXT NOT NULL CHECK (tier IN ('Foundation', 'Higher', 'Both')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS resources_id_tutor_idx ON resources (id, tutor_id);
+CREATE INDEX IF NOT EXISTS resources_tutor_topic_idx ON resources (tutor_id, topic, tier);
+
+CREATE TABLE IF NOT EXISTS lesson_resources (
+    lesson_id TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    tutor_id TEXT NOT NULL,
+    PRIMARY KEY (lesson_id, resource_id),
+    FOREIGN KEY (lesson_id, tutor_id) REFERENCES lessons (id, tutor_id) ON DELETE CASCADE,
+    FOREIGN KEY (resource_id, tutor_id) REFERENCES resources (id, tutor_id)
+);
+
+CREATE INDEX IF NOT EXISTS lesson_resources_tutor_idx ON lesson_resources (tutor_id, resource_id);
+
 INSERT INTO tutors (id, email)
 VALUES ('tut_local', 'tutor@localhost')
 ON CONFLICT (id) DO NOTHING;

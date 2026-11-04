@@ -13,6 +13,12 @@ from psycopg.types.json import Json
 
 from auth import configure_auth
 from db import get_connection, lesson_json, student_json
+from progress_resources import (
+    bp as progress_resources_bp,
+    lesson_resource_ids,
+    owned_resource_ids,
+    replace_lesson_resources,
+)
 from validation import validate_lesson, validate_student
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
@@ -59,6 +65,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     configure_auth(app)
     if test_config:
         app.config.update(test_config)
+    app.register_blueprint(progress_resources_bp)
 
     @app.errorhandler(RuntimeError)
     def handle_config_error(error):
@@ -107,6 +114,11 @@ def create_app(test_config: dict | None = None) -> Flask:
             f"SELECT {LESSON_SELECT} FROM lessons WHERE id = %s AND tutor_id = %s",
             (lesson_id, tutor_id()),
         ).fetchone()
+
+    def serialize_lesson(conn, row):
+        result = lesson_json(row)
+        result["resourceIds"] = lesson_resource_ids(conn, tutor_id(), row["id"])
+        return result
 
     @app.get("/api/health")
     def health():
@@ -271,7 +283,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         sql += " ORDER BY date, start_time"
         with get_connection() as conn:
             rows = conn.execute(sql, params).fetchall()
-        return jsonify({"lessons": [lesson_json(row) for row in rows]})
+            lessons = [serialize_lesson(conn, row) for row in rows]
+        return jsonify({"lessons": lessons})
 
     @app.post("/api/lessons")
     def create_lesson():
@@ -289,6 +302,8 @@ def create_app(test_config: dict | None = None) -> Flask:
                 return json_error("Validation failed", 400, {"studentId": "Student not found"})
             if student["archived_at"] is not None:
                 return json_error("Validation failed", 400, {"studentId": "Archived students cannot be scheduled"})
+            if not owned_resource_ids(conn, tutor_id(), payload["resource_ids"]):
+                return json_error("Validation failed", 400, {"resourceIds": "Resource not found"})
             row = conn.execute(
                 f"""
                 INSERT INTO lessons (
@@ -315,16 +330,19 @@ def create_app(test_config: dict | None = None) -> Flask:
                     payload["next_lesson_plan"],
                 ),
             ).fetchone()
+            replace_lesson_resources(conn, tutor_id(), lesson_id, payload["resource_ids"])
+            lesson = serialize_lesson(conn, row)
             conn.commit()
-        return jsonify({"lesson": lesson_json(row)}), 201
+        return jsonify({"lesson": lesson}), 201
 
     @app.get("/api/lessons/<lesson_id>")
     def get_lesson(lesson_id: str):
         with get_connection() as conn:
             row = fetch_owned_lesson(conn, lesson_id)
+            lesson = serialize_lesson(conn, row) if row else None
         if not row:
             return json_error("Lesson not found", 404)
-        return jsonify({"lesson": lesson_json(row)})
+        return jsonify({"lesson": lesson})
 
     @app.patch("/api/lessons/<lesson_id>")
     def update_lesson(lesson_id: str):
@@ -357,6 +375,13 @@ def create_app(test_config: dict | None = None) -> Flask:
                         400,
                         {"studentId": "Archived students cannot be scheduled"},
                     )
+                if payload["student_id"] != existing["student_id"] and conn.execute(
+                    "SELECT 1 FROM topic_observations WHERE lesson_id = %s AND tutor_id = %s LIMIT 1",
+                    (lesson_id, tutor_id()),
+                ).fetchone():
+                    return json_error("Validation failed", 400, {"studentId": "A lesson with topic observations cannot move to another student"})
+            if "resource_ids" in payload and not owned_resource_ids(conn, tutor_id(), payload["resource_ids"]):
+                return json_error("Validation failed", 400, {"resourceIds": "Resource not found"})
             values.extend([lesson_id, tutor_id()])
             row = conn.execute(
                 f"""
@@ -367,8 +392,11 @@ def create_app(test_config: dict | None = None) -> Flask:
                 """,
                 values,
             ).fetchone()
+            if "resource_ids" in payload:
+                replace_lesson_resources(conn, tutor_id(), lesson_id, payload["resource_ids"])
+            lesson = serialize_lesson(conn, row)
             conn.commit()
-        return jsonify({"lesson": lesson_json(row)})
+        return jsonify({"lesson": lesson})
 
     return app
 

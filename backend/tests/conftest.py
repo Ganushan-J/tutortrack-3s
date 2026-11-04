@@ -77,6 +77,7 @@ def db_client(monkeypatch):
     monkeypatch.setattr("app.get_connection", connect_to_test_schema)
     monkeypatch.setattr("db.get_connection", connect_to_test_schema)
     monkeypatch.setattr("auth.get_connection", connect_to_test_schema)
+    monkeypatch.setattr("progress_resources.get_connection", connect_to_test_schema)
 
     with connect_to_test_schema() as conn:
         run_sql_script(conn, sql)

@@ -6,17 +6,21 @@ import {
   createStudent as postStudent,
   fetchLessons,
   fetchStudents,
+  fetchResources,
+  createResource as postResource,
+  updateResource as patchResource,
   updateLesson as patchLesson,
   updateStudent as patchStudent,
 } from './api'
 import { todayISO } from './dates'
-import type { Lesson, LessonInput, NewStudent, Student } from './types'
+import type { Lesson, LessonInput, NewStudent, Student, SavedResource, ResourceInput } from './types'
 
 /** The Flask API is the source of truth; this context caches its responses for the UI. */
 interface TutorStore {
   today: string
   students: Student[]
   lessons: Lesson[]
+  resources: SavedResource[]
   loading: boolean
   loadError: string | null
   reload: () => void
@@ -26,6 +30,8 @@ interface TutorStore {
   updateStudent: (id: string, changes: Partial<NewStudent>) => Promise<Student>
   addLesson: (lesson: LessonInput) => Promise<Lesson>
   updateLesson: (id: string, changes: Partial<LessonInput>) => Promise<Lesson>
+  addResource: (resource: ResourceInput) => Promise<SavedResource>
+  updateResource: (id: string, changes: Partial<ResourceInput>) => Promise<SavedResource>
 }
 
 const TutorStoreContext = createContext<TutorStore | null>(null)
@@ -34,6 +40,7 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
   const [today] = useState(todayISO)
   const [students, setStudents] = useState<Student[]>([])
   const [lessons, setLessons] = useState<Lesson[]>([])
+  const [resources, setResources] = useState<SavedResource[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
@@ -42,11 +49,12 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
     let active = true
     setLoading(true)
     setLoadError(null)
-    Promise.all([fetchStudents(), fetchLessons()])
-      .then(([remoteStudents, remoteLessons]) => {
+    Promise.all([fetchStudents(), fetchLessons(), fetchResources()])
+      .then(([remoteStudents, remoteLessons, remoteResources]) => {
         if (!active) return
         setStudents(remoteStudents)
         setLessons(remoteLessons)
+        setResources(remoteResources)
       })
       .catch((error: unknown) => {
         if (active) setLoadError(error instanceof Error ? error.message : 'Could not load TutorTrack data.')
@@ -85,12 +93,24 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
     return lesson
   }, [])
 
+  const addResource = useCallback(async (input: ResourceInput) => {
+    const resource = await postResource(input)
+    setResources((previous) => [...previous, resource])
+    return resource
+  }, [])
+
+  const updateResource = useCallback(async (id: string, changes: Partial<ResourceInput>) => {
+    const resource = await patchResource(id, changes)
+    setResources((previous) => previous.map((item) => item.id === id ? resource : item))
+    return resource
+  }, [])
+
   const value = useMemo(
     () => ({
-      today, students, lessons, loading, loadError, reload,
-      getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson,
+      today, students, lessons, resources, loading, loadError, reload,
+      getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson, addResource, updateResource,
     }),
-    [today, students, lessons, loading, loadError, reload, getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson],
+    [today, students, lessons, resources, loading, loadError, reload, getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson, addResource, updateResource],
   )
 
   return <TutorStoreContext.Provider value={value}>{children}</TutorStoreContext.Provider>

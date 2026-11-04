@@ -41,6 +41,12 @@ python app.py
 
 Run `python setup_tutor.py` once to enter your email and a password locally (the password input is hidden). To deliberately replace it later, use `python setup_tutor.py --reset`. Open [http://127.0.0.1:5000/api/health](http://127.0.0.1:5000/api/health) to confirm Flask is running, then [http://localhost:3000](http://localhost:3000) to sign in. A direct unauthenticated API request to `/api/students` must return `401`.
 
+## Topic progress and resources
+
+After updating the code, run `python migrate.py` again from `backend/`. This additive migration creates `topic_observations`, `resources`, and `lesson_resources` without deleting existing students or lessons. The student profile records dated topic observations with status, evidence and a next action; repeated observations remain in history. The Resources page stores searchable links tagged by topic and tier. Select saved links in the lesson form; `resourceIds` are validated and attached in the same database transaction as the lesson save. Existing one-off `resourceLinks` remain supported.
+
+All these routes use the authenticated tutor session and `/api` prefix: `GET/POST /students/:id/progress`, `PATCH /progress/:id`, `GET/POST /resources`, `PATCH /resources/:id`. Each lesson response includes `resourceIds`; create/update accepts the array. The browser never supplies `tutor_id` as authority. Use fictional records in development.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 ## Learn More
