@@ -4,7 +4,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { EmptyState, LessonStatusBadge, SectionCard, TopicChip } from '@/components/shared'
 import { formatShortDate, formatTimeRange } from '@/lib/dates'
 import { needsNotes } from '@/lib/lessons'
-import type { Lesson } from '@/lib/types'
+import type { Lesson, SavedResource } from '@/lib/types'
 
 function NoteRow({ label, value }: { label: string; value: string }) {
   if (!value.trim()) return null
@@ -28,10 +28,12 @@ export function LessonHistory({
   lessons,
   today,
   className,
+  resources,
 }: {
   lessons: Lesson[]
   today: string
   className?: string
+  resources: SavedResource[]
 }) {
   return (
     <SectionCard title="Lesson history" description={`${lessons.length} past lessons`} className={className}>
@@ -41,6 +43,7 @@ export function LessonHistory({
         <ol className="divide-y divide-border">
           {lessons.map((lesson) => {
             const incomplete = needsNotes(lesson, today)
+            const linkedResources = resources.filter((resource) => lesson.resourceIds?.includes(resource.id) && /^https?:\/\//i.test(resource.url))
             return (
               <li key={lesson.id} className="flex flex-col gap-3 px-4 py-4 md:px-5">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -94,6 +97,18 @@ export function LessonHistory({
                         >
                           <ExternalLink className="size-3" aria-hidden="true" />
                           {hostname(url)}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {linkedResources.length > 0 && (
+                  <ul className="flex flex-wrap gap-2">
+                    {linkedResources.map((resource) => (
+                      <li key={resource.id}>
+                        <a href={resource.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+                          <ExternalLink className="size-3" aria-hidden="true" />
+                          {resource.title}
                         </a>
                       </li>
                     ))}
