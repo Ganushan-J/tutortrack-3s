@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, NotebookPen, Sigma, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTutorStore } from '@/lib/tutor-store'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,6 +31,7 @@ function Logo() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { loading, loadError, reload } = useTutorStore()
 
   return (
     <div className="flex min-h-dvh">
@@ -57,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <p className="mt-auto px-3 text-xs leading-relaxed text-muted-foreground">
-          GCSE Maths · Demo data
+          GCSE Maths · TutorTrack
         </p>
       </aside>
 
@@ -67,7 +69,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 px-4 pt-6 pb-28 sm:px-6 md:px-8 md:pt-8 md:pb-12">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+          <div className="mx-auto w-full max-w-6xl">
+            {loading && <p role="status" className="mb-4 text-sm text-muted-foreground">Loading students and lessons…</p>}
+            {loadError && (
+              <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-card p-3 text-sm">
+                <span>Could not load your data: {loadError}</span>
+                <button type="button" onClick={reload} className="font-medium text-primary underline">Retry</button>
+              </div>
+            )}
+            {children}
+          </div>
         </main>
 
         <nav

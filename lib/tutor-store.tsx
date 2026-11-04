@@ -1,77 +1,96 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import {
+  createLesson as postLesson,
+  createStudent as postStudent,
+  fetchLessons,
+  fetchStudents,
+  updateLesson as patchLesson,
+  updateStudent as patchStudent,
+} from './api'
 import { todayISO } from './dates'
-import { createId } from './lessons'
-import { createSampleData } from './sample-data'
 import type { Lesson, LessonInput, NewStudent, Student } from './types'
 
-/**
- * In-memory store for the frontend-only build. When the Flask API is ready,
- * swap these actions for API calls (e.g. via SWR) — components only use this hook.
- */
+/** The Flask API is the source of truth; this context caches its responses for the UI. */
 interface TutorStore {
   today: string
   students: Student[]
   lessons: Lesson[]
+  loading: boolean
+  loadError: string | null
+  reload: () => void
   getStudent: (id: string) => Student | undefined
   getLesson: (id: string) => Lesson | undefined
-  addStudent: (student: NewStudent) => Student
-  updateStudent: (id: string, changes: Partial<NewStudent>) => void
-  addLesson: (lesson: LessonInput) => Lesson
-  updateLesson: (id: string, changes: Partial<LessonInput>) => void
+  addStudent: (student: NewStudent) => Promise<Student>
+  updateStudent: (id: string, changes: Partial<NewStudent>) => Promise<Student>
+  addLesson: (lesson: LessonInput) => Promise<Lesson>
+  updateLesson: (id: string, changes: Partial<LessonInput>) => Promise<Lesson>
 }
 
 const TutorStoreContext = createContext<TutorStore | null>(null)
 
 export function TutorStoreProvider({ children }: { children: React.ReactNode }) {
-  const [initial] = useState(() => {
-    const today = todayISO()
-    return { today, ...createSampleData(today) }
-  })
-  const [students, setStudents] = useState<Student[]>(initial.students)
-  const [lessons, setLessons] = useState<Lesson[]>(initial.lessons)
-  const { today } = initial
+  const [today] = useState(todayISO)
+  const [students, setStudents] = useState<Student[]>([])
+  const [lessons, setLessons] = useState<Lesson[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
 
-  const getStudent = useCallback((id: string) => students.find((s) => s.id === id), [students])
-  const getLesson = useCallback((id: string) => lessons.find((l) => l.id === id), [lessons])
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setLoadError(null)
+    Promise.all([fetchStudents(), fetchLessons()])
+      .then(([remoteStudents, remoteLessons]) => {
+        if (!active) return
+        setStudents(remoteStudents)
+        setLessons(remoteLessons)
+      })
+      .catch((error: unknown) => {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Could not load TutorTrack data.')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [revision])
 
-  const addStudent = useCallback(
-    (input: NewStudent) => {
-      const student: Student = { ...input, id: createId('stu'), createdAt: today }
-      setStudents((prev) => [...prev, student])
-      return student
-    },
-    [today],
-  )
+  const reload = useCallback(() => setRevision((value) => value + 1), [])
+  const getStudent = useCallback((id: string) => students.find((student) => student.id === id), [students])
+  const getLesson = useCallback((id: string) => lessons.find((lesson) => lesson.id === id), [lessons])
 
-  const updateStudent = useCallback((id: string, changes: Partial<NewStudent>) => {
-    setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, ...changes } : s)))
+  const addStudent = useCallback(async (input: NewStudent) => {
+    const student = await postStudent(input)
+    setStudents((previous) => [...previous, student])
+    return student
   }, [])
 
-  const addLesson = useCallback((input: LessonInput) => {
-    const lesson: Lesson = { ...input, id: createId('les') }
-    setLessons((prev) => [...prev, lesson])
+  const updateStudent = useCallback(async (id: string, changes: Partial<NewStudent>) => {
+    const student = await patchStudent(id, changes)
+    setStudents((previous) => previous.map((item) => item.id === id ? student : item))
+    return student
+  }, [])
+
+  const addLesson = useCallback(async (input: LessonInput) => {
+    const lesson = await postLesson(input)
+    setLessons((previous) => [...previous, lesson])
     return lesson
   }, [])
 
-  const updateLesson = useCallback((id: string, changes: Partial<LessonInput>) => {
-    setLessons((prev) => prev.map((l) => (l.id === id ? { ...l, ...changes } : l)))
+  const updateLesson = useCallback(async (id: string, changes: Partial<LessonInput>) => {
+    const lesson = await patchLesson(id, changes)
+    setLessons((previous) => previous.map((item) => item.id === id ? lesson : item))
+    return lesson
   }, [])
 
   const value = useMemo(
     () => ({
-      today,
-      students,
-      lessons,
-      getStudent,
-      getLesson,
-      addStudent,
-      updateStudent,
-      addLesson,
-      updateLesson,
+      today, students, lessons, loading, loadError, reload,
+      getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson,
     }),
-    [today, students, lessons, getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson],
+    [today, students, lessons, loading, loadError, reload, getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson],
   )
 
   return <TutorStoreContext.Provider value={value}>{children}</TutorStoreContext.Provider>
