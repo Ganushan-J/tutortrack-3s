@@ -10,8 +10,10 @@ import { useTutorStore } from '@/lib/tutor-store'
 import { LessonHistory } from './lesson-history'
 
 export function StudentProfile({ studentId }: { studentId: string }) {
-  const { getStudent, lessons, today } = useTutorStore()
+  const { getStudent, lessons, today, loading, loadError } = useTutorStore()
   const student = getStudent(studentId)
+
+  if (loading || loadError) return null
 
   if (!student) {
     return (
