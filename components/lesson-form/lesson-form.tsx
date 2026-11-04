@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { FormField, NativeSelect, SegmentedControl } from '@/components/form-controls'
 import { EmptyState, PageHeader } from '@/components/shared'
 import { fullName } from '@/lib/lessons'
+import { ApiError } from '@/lib/api'
 import { useTutorStore } from '@/lib/tutor-store'
 import { LESSON_DURATIONS, LESSON_STATUSES, type Lesson, type LessonStatus } from '@/lib/types'
 import { FormSection } from './form-section'
@@ -19,8 +20,10 @@ import { TopicPicker } from './topic-picker'
 type Props = { lessonId?: string; defaultStudentId?: string }
 
 export function LessonForm({ lessonId, defaultStudentId }: Props) {
-  const { getLesson } = useTutorStore()
+  const { getLesson, loading, loadError } = useTutorStore()
   const existing = lessonId ? getLesson(lessonId) : undefined
+
+  if (loading || loadError) return null
 
   if (lessonId && !existing) {
     return (
@@ -59,6 +62,9 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
   const [nextPlan, setNextPlan] = useState(existing?.nextLessonPlan ?? '')
   const [nextTopic, setNextTopic] = useState(getStudent(initialStudentId)?.nextTopic ?? '')
   const [error, setError] = useState('')
+  const [formError, setFormError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [savedLessonId, setSavedLessonId] = useState<string | null>(existing?.id ?? null)
 
   const student = getStudent(studentId)
   const isEdit = !!existing
@@ -70,8 +76,11 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
     setError('')
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (saving) return
+    setError('')
+    setFormError('')
     if (!studentId) {
       setError('Choose a student')
       document.getElementById('studentId')?.focus()
@@ -90,13 +99,27 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
       resourceLinks: links,
       nextLessonPlan: nextPlan.trim(),
     }
-    if (existing) updateLesson(existing.id, input)
-    else addLesson(input)
-
-    if (student && nextTopic.trim() !== student.nextTopic) {
-      updateStudent(student.id, { nextTopic: nextTopic.trim() })
+    setSaving(true)
+    let lessonWasSaved = false
+    try {
+      if (savedLessonId) {
+        await updateLesson(savedLessonId, input)
+      } else {
+        const lesson = await addLesson(input)
+        setSavedLessonId(lesson.id)
+      }
+      lessonWasSaved = true
+      if (student && nextTopic.trim() !== student.nextTopic) {
+        await updateStudent(student.id, { nextTopic: nextTopic.trim() })
+      }
+      router.push('/students/' + studentId)
+    } catch (cause) {
+      if (cause instanceof ApiError) setError(cause.errors.studentId ?? '')
+      const message = cause instanceof Error ? cause.message : 'Please try again.'
+      setFormError(lessonWasSaved ? 'Lesson saved, but the next topic did not update. Save again to retry. ' + message : message)
+    } finally {
+      setSaving(false)
     }
-    router.push(`/students/${studentId}`)
   }
 
   const backHref = student ? `/students/${student.id}` : '/'
@@ -121,7 +144,8 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
         }
       />
 
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 md:gap-6">
+      <form onSubmit={handleSubmit} noValidate aria-busy={saving} className="flex flex-col gap-4 md:gap-6">
+        {formError && <p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{formError}</p>}
         <FormSection title="Session" description="Who, when and how it went">
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <FormField id="studentId" label="Student" error={error} className="sm:col-span-2 lg:col-span-1">
@@ -254,8 +278,8 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
           <Link href={backHref} className={buttonVariants({ variant: 'ghost', size: 'lg' })}>
             Cancel
           </Link>
-          <Button type="submit" size="lg">
-            {isEdit ? 'Save changes' : 'Save lesson'}
+          <Button type="submit" size="lg" disabled={saving}>
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save lesson'}
           </Button>
         </div>
       </form>
