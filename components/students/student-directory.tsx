@@ -88,7 +88,7 @@ export function StudentDirectory() {
 
       {students.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          No students yet. Use “Add student” to create your first fictional test record.
+          No students yet. Use “Add student” to create your first student.
         </div>
       ) : (
         <StudentList students={filtered} nextLessons={upcomingByStudent} today={today} />
