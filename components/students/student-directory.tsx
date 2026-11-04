@@ -15,10 +15,12 @@ const TIER_FILTERS = ['All', 'Foundation', 'Higher'] as const
 type TierFilter = (typeof TIER_FILTERS)[number]
 
 export function StudentDirectory() {
-  const { students, lessons, today } = useTutorStore()
+  const { students, lessons, today, loading, loadError } = useTutorStore()
   const [query, setQuery] = useState('')
   const [tierFilter, setTierFilter] = useState<TierFilter>('All')
   const [showForm, setShowForm] = useState(false)
+
+  if (loading || loadError) return null
 
   const normalisedQuery = query.trim().toLowerCase()
   const filtered = students
@@ -84,7 +86,13 @@ export function StudentDirectory() {
         </div>
       </div>
 
-      <StudentList students={filtered} nextLessons={upcomingByStudent} today={today} />
+      {students.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+          No students yet. Use “Add student” to create your first fictional test record.
+        </div>
+      ) : (
+        <StudentList students={filtered} nextLessons={upcomingByStudent} today={today} />
+      )}
     </>
   )
 }
