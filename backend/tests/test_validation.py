@@ -64,3 +64,16 @@ def test_lesson_rejects_non_http_links():
     payload, errors = validate_lesson(valid_lesson(resourceLinks=["javascript:alert(1)"]))
     assert payload is None
     assert "resourceLinks" in errors
+
+
+def test_next_topic_is_optional_trimmed_and_length_checked():
+    payload, errors = validate_lesson(valid_lesson(nextTopic="  Fractions  "))
+    assert errors == {}
+    assert payload["next_topic"] == "Fractions"
+    payload, errors = validate_lesson(valid_lesson())
+    assert errors == {}
+    assert "next_topic" not in payload
+    for value in (None, 123, "a" * 121):
+        payload, errors = validate_lesson(valid_lesson(nextTopic=value))
+        assert payload is None
+        assert "nextTopic" in errors
