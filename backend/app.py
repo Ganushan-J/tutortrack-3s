@@ -333,9 +333,16 @@ def create_app(test_config: dict | None = None) -> Flask:
                 ),
             ).fetchone()
             replace_lesson_resources(conn, tutor_id(), lesson_id, payload["resource_ids"])
+            updated_student = None
+            if "next_topic" in payload:
+                updated_student = conn.execute(
+                    f"UPDATE students SET next_topic = %s, updated_at = now() "
+                    f"WHERE id = %s AND tutor_id = %s RETURNING {STUDENT_SELECT}",
+                    (payload["next_topic"], payload["student_id"], tutor_id()),
+                ).fetchone()
             lesson = serialize_lesson(conn, row)
             conn.commit()
-        return jsonify({"lesson": lesson}), 201
+        return jsonify({"lesson": lesson, "student": student_json(updated_student) if updated_student else None}), 201
 
     @app.get("/api/lessons/<lesson_id>")
     def get_lesson(lesson_id: str):
@@ -367,17 +374,21 @@ def create_app(test_config: dict | None = None) -> Flask:
             existing = fetch_owned_lesson(conn, lesson_id)
             if not existing:
                 return json_error("Lesson not found", 404)
-            if "student_id" in payload:
-                student = fetch_owned_student(conn, payload["student_id"])
+            if "student_id" in payload or "next_topic" in payload or payload.get("status") == "scheduled":
+                target_id = payload.get("student_id", existing["student_id"])
+                student = fetch_owned_student(conn, target_id)
                 if not student:
                     return json_error("Validation failed", 400, {"studentId": "Student not found"})
-                if student["archived_at"] is not None:
+                if student["archived_at"] is not None and (
+                    target_id != existing["student_id"]
+                    or payload.get("status", existing["status"]) == "scheduled"
+                ):
                     return json_error(
                         "Validation failed",
                         400,
                         {"studentId": "Archived students cannot be scheduled"},
                     )
-                if payload["student_id"] != existing["student_id"] and conn.execute(
+                if target_id != existing["student_id"] and conn.execute(
                     "SELECT 1 FROM topic_observations WHERE lesson_id = %s AND tutor_id = %s LIMIT 1",
                     (lesson_id, tutor_id()),
                 ).fetchone():
@@ -396,9 +407,16 @@ def create_app(test_config: dict | None = None) -> Flask:
             ).fetchone()
             if "resource_ids" in payload:
                 replace_lesson_resources(conn, tutor_id(), lesson_id, payload["resource_ids"])
+            updated_student = None
+            if "next_topic" in payload:
+                updated_student = conn.execute(
+                    f"UPDATE students SET next_topic = %s, updated_at = now() "
+                    f"WHERE id = %s AND tutor_id = %s RETURNING {STUDENT_SELECT}",
+                    (payload["next_topic"], payload.get("student_id", existing["student_id"]), tutor_id()),
+                ).fetchone()
             lesson = serialize_lesson(conn, row)
             conn.commit()
-        return jsonify({"lesson": lesson})
+        return jsonify({"lesson": lesson, "student": student_json(updated_student) if updated_student else None})
 
     return app
 
