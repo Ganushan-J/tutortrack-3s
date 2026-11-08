@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, LayoutDashboard, LogOut, NotebookPen, Sigma, Users } from 'lucide-react'
+import { BookOpen, FileText, LayoutDashboard, LogOut, NotebookPen, Sigma, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTutorStore } from '@/lib/tutor-store'
 import { useAuth } from '@/lib/auth-context'
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/students', label: 'Students', icon: Users },
   { href: '/resources', label: 'Resources', icon: BookOpen },
+  { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/lessons/new', label: 'Log lesson', icon: NotebookPen },
 ] as const
 
@@ -93,7 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <nav
           aria-label="Main"
-          className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-border bg-sidebar/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+          className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-border bg-sidebar/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         >
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const active = isActive(pathname, href)
