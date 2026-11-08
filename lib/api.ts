@@ -88,16 +88,23 @@ export async function updateStudent(id: string, changes: Partial<NewStudent>): P
   return (await request<{ student: Student }>('/api/students/' + encodeURIComponent(id), json('PATCH', changes))).student
 }
 
+export async function setStudentArchived(id: string, archived: boolean): Promise<Student> {
+  const action = archived ? 'archive' : 'restore'
+  return (await request<{ student: Student }>('/api/students/' + encodeURIComponent(id) + '/' + action, { method: 'POST' })).student
+}
+
 export async function fetchLessons(): Promise<Lesson[]> {
   return (await request<{ lessons: Lesson[] }>('/api/lessons')).lessons
 }
 
-export async function createLesson(input: LessonInput): Promise<Lesson> {
-  return (await request<{ lesson: Lesson }>('/api/lessons', json('POST', input))).lesson
+interface LessonResponse { lesson: Lesson; student: Student | null }
+
+export async function createLesson(input: LessonInput): Promise<LessonResponse> {
+  return request<LessonResponse>('/api/lessons', json('POST', input))
 }
 
-export async function updateLesson(id: string, changes: Partial<LessonInput>): Promise<Lesson> {
-  return (await request<{ lesson: Lesson }>('/api/lessons/' + encodeURIComponent(id), json('PATCH', changes))).lesson
+export async function updateLesson(id: string, changes: Partial<LessonInput>): Promise<LessonResponse> {
+  return request<LessonResponse>('/api/lessons/' + encodeURIComponent(id), json('PATCH', changes))
 }
 
 export async function fetchProgress(studentId: string): Promise<TopicObservation[]> {

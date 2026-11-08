@@ -1,17 +1,22 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Plus, Target } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { EmptyState, PageHeader, SectionCard, StudentAvatar, TierBadge } from '@/components/shared'
 import { formatRelativeDay, formatTimeRange } from '@/lib/dates'
 import { compareLessonsAsc, compareLessonsDesc, fullName, isUpcoming } from '@/lib/lessons'
 import { useTutorStore } from '@/lib/tutor-store'
 import { LessonHistory } from './lesson-history'
 import { TopicProgress } from './topic-progress'
+import { AddStudentForm } from '@/components/students/add-student-form'
 
 export function StudentProfile({ studentId }: { studentId: string }) {
-  const { getStudent, lessons, resources, today, loading, loadError } = useTutorStore()
+  const { getStudent, lessons, resources, today, loading, loadError, setArchived } = useTutorStore()
+  const [editing, setEditing] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [actionError, setActionError] = useState('')
   const student = getStudent(studentId)
 
   if (loading || loadError) return null
@@ -43,6 +48,21 @@ export function StudentProfile({ studentId }: { studentId: string }) {
     { label: 'Lessons completed', value: <span className="font-mono">{completedCount}</span> },
   ]
 
+  async function changeArchiveState() {
+    if (!student || archiving) return
+    if (!student.archived && !window.confirm('Archive this student? Their lessons and reports will remain available.')) return
+    setArchiving(true)
+    setActionError('')
+    try {
+      await setArchived(student.id, !student.archived)
+      setEditing(false)
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'Could not update this student.')
+    } finally {
+      setArchiving(false)
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -56,14 +76,27 @@ export function StudentProfile({ studentId }: { studentId: string }) {
           </Link>
         }
         title={fullName(student)}
-        description={`${student.yearGroup} · ${student.examBoard} ${student.tier}`}
+        description={`${student.yearGroup} · ${student.examBoard} ${student.tier}${student.archived ? ' · Archived' : ''}`}
         actions={
-          <Link href={`/lessons/new?studentId=${student.id}`} className={buttonVariants({ size: 'lg' })}>
-            <Plus data-icon="inline-start" aria-hidden="true" />
-            Log lesson
-          </Link>
+          <>
+            <Button type="button" variant="outline" onClick={() => setEditing((value) => !value)} aria-expanded={editing}>
+              {editing ? 'Close editor' : 'Edit student'}
+            </Button>
+            <Button type="button" variant="outline" disabled={archiving} onClick={() => void changeArchiveState()}>
+              {archiving ? 'Saving…' : student.archived ? 'Restore student' : 'Archive student'}
+            </Button>
+            {!student.archived && (
+              <Link href={`/lessons/new?studentId=${student.id}`} className={buttonVariants({ size: 'lg' })}>
+                <Plus data-icon="inline-start" aria-hidden="true" />
+                Log lesson
+              </Link>
+            )}
+          </>
         }
       />
+
+      {actionError && <p role="alert" className="mb-4 text-sm text-destructive">{actionError}</p>}
+      {editing && <div className="mb-6"><AddStudentForm key={student.id} student={student} onCancel={() => setEditing(false)} onSaved={() => setEditing(false)} /></div>}
 
       <div className="grid gap-4 md:gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-4 md:gap-6">
@@ -120,7 +153,7 @@ export function StudentProfile({ studentId }: { studentId: string }) {
               </ol>
             )}
           </SectionCard>
-          <TopicProgress studentId={student.id} nextTopic={student.nextTopic} today={today} lessons={studentLessons} />
+          <TopicProgress key={student.id} studentId={student.id} nextTopic={student.nextTopic} today={today} lessons={studentLessons} />
         </div>
 
         <LessonHistory className="lg:col-span-2" lessons={history} today={today} resources={resources} />

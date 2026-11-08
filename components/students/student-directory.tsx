@@ -19,11 +19,14 @@ export function StudentDirectory() {
   const [query, setQuery] = useState('')
   const [tierFilter, setTierFilter] = useState<TierFilter>('All')
   const [showForm, setShowForm] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
 
   if (loading || loadError) return null
 
   const normalisedQuery = query.trim().toLowerCase()
+  const activeCount = students.filter((student) => !student.archived).length
   const filtered = students
+    .filter((student) => showArchived || !student.archived)
     .filter((s) => tierFilter === 'All' || s.tier === tierFilter)
     .filter((s) => {
       if (!normalisedQuery) return true
@@ -34,7 +37,7 @@ export function StudentDirectory() {
     .sort((a, b) => fullName(a).localeCompare(fullName(b)))
 
   const upcomingByStudent = new Map<string, (typeof lessons)[number]>()
-  for (const lesson of lessons.filter((l) => isUpcoming(l, today)).sort(compareLessonsAsc)) {
+  for (const lesson of lessons.filter((l) => isUpcoming(l, today) && students.some((s) => s.id === l.studentId && !s.archived)).sort(compareLessonsAsc)) {
     if (!upcomingByStudent.has(lesson.studentId)) upcomingByStudent.set(lesson.studentId, lesson)
   }
 
@@ -42,7 +45,7 @@ export function StudentDirectory() {
     <>
       <PageHeader
         title="Students"
-        description={`${students.length} active students`}
+        description={`${activeCount} active students`}
         actions={
           <Button size="lg" variant={showForm ? 'outline' : 'default'} onClick={() => setShowForm((v) => !v)} aria-expanded={showForm}>
             {showForm ? <X data-icon="inline-start" aria-hidden="true" /> : <Plus data-icon="inline-start" aria-hidden="true" />}
@@ -86,9 +89,14 @@ export function StudentDirectory() {
         </div>
       </div>
 
-      {students.length === 0 ? (
+      <label className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground">
+        <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+        Include archived students
+      </label>
+
+      {activeCount === 0 && !showArchived ? (
         <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          No students yet. Use “Add student” to create your first student.
+          {students.length ? 'No active students. Include archived students to view their history.' : 'No students yet. Use “Add student” to create your first student.'}
         </div>
       ) : (
         <StudentList students={filtered} nextLessons={upcomingByStudent} today={today} />

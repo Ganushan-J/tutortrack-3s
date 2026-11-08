@@ -28,7 +28,6 @@ export function TopicProgress({ studentId, nextTopic, today, lessons }: { studen
 
   useEffect(() => {
     let active = true
-    setLoading(true)
     fetchProgress(studentId)
       .then((observations) => { if (active) { setItems(observations); setLoadError('') } })
       .catch((cause: unknown) => { if (active) setLoadError(cause instanceof Error ? cause.message : 'Could not load progress.') })

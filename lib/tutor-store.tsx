@@ -11,6 +11,7 @@ import {
   updateResource as patchResource,
   updateLesson as patchLesson,
   updateStudent as patchStudent,
+  setStudentArchived as postArchiveState,
 } from './api'
 import { londonClock, todayISO } from './dates'
 import type { Lesson, LessonInput, NewStudent, Student, SavedResource, ResourceInput } from './types'
@@ -29,6 +30,7 @@ interface TutorStore {
   getLesson: (id: string) => Lesson | undefined
   addStudent: (student: NewStudent) => Promise<Student>
   updateStudent: (id: string, changes: Partial<NewStudent>) => Promise<Student>
+  setArchived: (id: string, archived: boolean) => Promise<Student>
   addLesson: (lesson: LessonInput) => Promise<Lesson>
   updateLesson: (id: string, changes: Partial<LessonInput>) => Promise<Lesson>
   addResource: (resource: ResourceInput) => Promise<SavedResource>
@@ -58,9 +60,7 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    setLoadError(null)
-    Promise.all([fetchStudents(), fetchLessons(), fetchResources()])
+    Promise.all([fetchStudents(true), fetchLessons(), fetchResources()])
       .then(([remoteStudents, remoteLessons, remoteResources]) => {
         if (!active) return
         setStudents(remoteStudents)
@@ -76,7 +76,11 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
     return () => { active = false }
   }, [revision])
 
-  const reload = useCallback(() => setRevision((value) => value + 1), [])
+  const reload = useCallback(() => {
+    setLoading(true)
+    setLoadError(null)
+    setRevision((value) => value + 1)
+  }, [])
   const getStudent = useCallback((id: string) => students.find((student) => student.id === id), [students])
   const getLesson = useCallback((id: string) => lessons.find((lesson) => lesson.id === id), [lessons])
 
@@ -92,15 +96,23 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
     return student
   }, [])
 
+  const setArchived = useCallback(async (id: string, archived: boolean) => {
+    const student = await postArchiveState(id, archived)
+    setStudents((previous) => previous.map((item) => item.id === id ? student : item))
+    return student
+  }, [])
+
   const addLesson = useCallback(async (input: LessonInput) => {
-    const lesson = await postLesson(input)
+    const { lesson, student } = await postLesson(input)
     setLessons((previous) => [...previous, lesson])
+    if (student) setStudents((previous) => previous.map((item) => item.id === student.id ? student : item))
     return lesson
   }, [])
 
   const updateLesson = useCallback(async (id: string, changes: Partial<LessonInput>) => {
-    const lesson = await patchLesson(id, changes)
+    const { lesson, student } = await patchLesson(id, changes)
     setLessons((previous) => previous.map((item) => item.id === id ? lesson : item))
+    if (student) setStudents((previous) => previous.map((item) => item.id === student.id ? student : item))
     return lesson
   }, [])
 
@@ -119,9 +131,9 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
   const value = useMemo(
     () => ({
       today, clock, students, lessons, resources, loading, loadError, reload,
-      getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson, addResource, updateResource,
+      getStudent, getLesson, addStudent, updateStudent, setArchived, addLesson, updateLesson, addResource, updateResource,
     }),
-    [today, clock, students, lessons, resources, loading, loadError, reload, getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson, addResource, updateResource],
+    [today, clock, students, lessons, resources, loading, loadError, reload, getStudent, getLesson, addStudent, updateStudent, setArchived, addLesson, updateLesson, addResource, updateResource],
   )
 
   return <TutorStoreContext.Provider value={value}>{children}</TutorStoreContext.Provider>

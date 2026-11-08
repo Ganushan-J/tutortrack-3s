@@ -7,25 +7,25 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { FormField, NativeSelect, SegmentedControl } from '@/components/form-controls'
 import { ApiError } from '@/lib/api'
-import { GCSE_TOPICS } from '@/lib/sample-data'
+import { GCSE_TOPICS } from '@/lib/topics'
 import { useTutorStore } from '@/lib/tutor-store'
-import { EXAM_BOARDS, TIERS, YEAR_GROUPS, type ExamBoard, type Grade, type Tier, type YearGroup } from '@/lib/types'
+import { EXAM_BOARDS, TIERS, YEAR_GROUPS, type ExamBoard, type Grade, type Student, type Tier, type YearGroup } from '@/lib/types'
 
 const ALL_GRADES: Grade[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 const maxGradeForTier = (tier: Tier) => (tier === 'Foundation' ? 5 : 9)
 
-export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
+export function AddStudentForm({ onCancel, student, onSaved }: { onCancel: () => void; student?: Student; onSaved?: () => void }) {
   const router = useRouter()
-  const { addStudent } = useTutorStore()
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [yearGroup, setYearGroup] = useState<YearGroup>('Year 11')
-  const [examBoard, setExamBoard] = useState<ExamBoard>('AQA')
-  const [tier, setTier] = useState<Tier>('Higher')
-  const [currentGrade, setCurrentGrade] = useState<Grade>(5)
-  const [targetGrade, setTargetGrade] = useState<Grade>(7)
-  const [goals, setGoals] = useState('')
-  const [nextTopic, setNextTopic] = useState('')
+  const { addStudent, updateStudent } = useTutorStore()
+  const [firstName, setFirstName] = useState(student?.firstName ?? '')
+  const [lastName, setLastName] = useState(student?.lastName ?? '')
+  const [yearGroup, setYearGroup] = useState<YearGroup>(student?.yearGroup ?? 'Year 11')
+  const [examBoard, setExamBoard] = useState<ExamBoard>(student?.examBoard ?? 'AQA')
+  const [tier, setTier] = useState<Tier>(student?.tier ?? 'Higher')
+  const [currentGrade, setCurrentGrade] = useState<Grade>(student?.currentGrade ?? 5)
+  const [targetGrade, setTargetGrade] = useState<Grade>(student?.targetGrade ?? 7)
+  const [goals, setGoals] = useState(student?.learningGoals.join('\n') ?? '')
+  const [nextTopic, setNextTopic] = useState(student?.nextTopic ?? '')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
@@ -48,7 +48,7 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
 
     setSaving(true)
     try {
-      const student = await addStudent({
+      const input = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         yearGroup,
@@ -61,8 +61,14 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
           .map((g) => g.trim())
           .filter(Boolean),
         nextTopic: nextTopic.trim(),
-      })
-      router.push(`/students/${student.id}`)
+      }
+      if (student) {
+        await updateStudent(student.id, input)
+        onSaved?.()
+      } else {
+        const created = await addStudent(input)
+        router.push(`/students/${created.id}`)
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         setErrors({ form: error.message, ...error.errors })
@@ -78,14 +84,14 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
     <form
       onSubmit={handleSubmit}
       noValidate
-      aria-labelledby="add-student-heading"
+      aria-labelledby="student-form-heading"
       className="rounded-xl border border-primary/30 bg-card"
     >
       <div className="border-b border-border px-4 py-3.5 md:px-5">
-        <h2 id="add-student-heading" className="text-sm font-semibold">
-          Add student
+        <h2 id="student-form-heading" className="text-sm font-semibold">
+          {student ? 'Edit student' : 'Add student'}
         </h2>
-        <p className="text-xs text-muted-foreground">You can edit goals and topics later from their profile.</p>
+        <p className="text-xs text-muted-foreground">Keep learning goals and the next topic up to date.</p>
         {errors.form ? (
           <p className="mt-2 text-xs text-destructive" role="alert">
             {errors.form}
@@ -195,7 +201,7 @@ export function AddStudentForm({ onCancel }: { onCancel: () => void }) {
           Cancel
         </Button>
         <Button type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Save student'}
+          {saving ? 'Saving…' : student ? 'Save changes' : 'Save student'}
         </Button>
       </div>
     </form>
