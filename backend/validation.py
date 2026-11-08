@@ -214,6 +214,15 @@ def validate_lesson(body, *, partial: bool = False) -> tuple[dict | None, dict[s
     if not partial or "nextLessonPlan" in body:
         data["next_lesson_plan"] = _optional_note(body.get("nextLessonPlan", ""), "nextLessonPlan", errors)
 
+    # Optional on lessons: when supplied, update the student's profile in
+    # the same transaction as the lesson instead of a second browser request.
+    if "nextTopic" in body:
+        next_topic = as_trimmed_string(body["nextTopic"])
+        if next_topic is None or len(next_topic) > MAX_TOPIC_LENGTH:
+            errors["nextTopic"] = f"Topic must be text of at most {MAX_TOPIC_LENGTH} characters"
+        else:
+            data["next_topic"] = next_topic
+
     if not partial or "resourceLinks" in body:
         links = _require_string_list(
             body.get("resourceLinks", []),
