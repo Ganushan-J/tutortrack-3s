@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { GCSE_TOPICS } from '@/lib/sample-data'
+import { GCSE_TOPICS } from '@/lib/topics'
 import { cn } from '@/lib/utils'
 
 export function TopicPicker({ selected, onChange }: { selected: string[]; onChange: (topics: string[]) => void }) {
