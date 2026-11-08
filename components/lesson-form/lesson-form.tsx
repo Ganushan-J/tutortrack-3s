@@ -43,11 +43,13 @@ export function LessonForm({ lessonId, defaultStudentId }: Props) {
 
 function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; defaultStudentId?: string }) {
   const router = useRouter()
-  const { students, resources, today, getStudent, addLesson, updateLesson, updateStudent } = useTutorStore()
-  const sortedStudents = [...students].sort((a, b) => fullName(a).localeCompare(fullName(b)))
+  const { students, resources, today, getStudent, addLesson, updateLesson } = useTutorStore()
+  const sortedStudents = students
+    .filter((item) => !item.archived || item.id === existing?.studentId)
+    .sort((a, b) => fullName(a).localeCompare(fullName(b)))
 
   const initialStudentId =
-    existing?.studentId ?? (defaultStudentId && getStudent(defaultStudentId) ? defaultStudentId : '')
+    existing?.studentId ?? (defaultStudentId && !getStudent(defaultStudentId)?.archived ? defaultStudentId : '')
 
   const [studentId, setStudentId] = useState(initialStudentId)
   const [date, setDate] = useState(existing?.date ?? today)
@@ -66,7 +68,6 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
   const [error, setError] = useState('')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [savedLessonId, setSavedLessonId] = useState<string | null>(existing?.id ?? null)
 
   const student = getStudent(studentId)
   const isEdit = !!existing
@@ -101,27 +102,22 @@ function LessonFormInner({ existing, defaultStudentId }: { existing?: Lesson; de
       resourceLinks: links,
       resourceIds,
       nextLessonPlan: nextPlan.trim(),
+      nextTopic: nextTopic.trim(),
     }
     setSaving(true)
-    let lessonWasSaved = false
     try {
-      if (savedLessonId) {
-        await updateLesson(savedLessonId, input)
+      if (existing) {
+        await updateLesson(existing.id, input)
       } else {
-        const lesson = await addLesson(input)
-        setSavedLessonId(lesson.id)
-      }
-      lessonWasSaved = true
-      if (student && nextTopic.trim() !== student.nextTopic) {
-        await updateStudent(student.id, { nextTopic: nextTopic.trim() })
+        await addLesson(input)
       }
       router.push('/students/' + studentId)
     } catch (cause) {
       if (cause instanceof ApiError) setError(cause.errors.studentId ?? '')
-      const message = cause instanceof ApiError && cause.errors.resourceIds
-        ? cause.errors.resourceIds
+      const message = cause instanceof ApiError && (cause.errors.resourceIds || cause.errors.nextTopic)
+        ? cause.errors.resourceIds || cause.errors.nextTopic
         : cause instanceof Error ? cause.message : 'Please try again.'
-      setFormError(lessonWasSaved ? 'Lesson saved, but the next topic did not update. Save again to retry. ' + message : message)
+      setFormError(message)
     } finally {
       setSaving(false)
     }
