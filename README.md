@@ -47,6 +47,14 @@ After updating the code, run `python migrate.py` again from `backend/`. This add
 
 All these routes use the authenticated tutor session and `/api` prefix: `GET/POST /students/:id/progress`, `PATCH /progress/:id`, `GET/POST /resources`, `PATCH /resources/:id`. Each lesson response includes `resourceIds`; create/update accepts the array. The browser never supplies `tutor_id` as authority. Use fictional records in development.
 
+## Monthly reports and dashboard
+
+Run `python migrate.py` again from `backend/` after updating. The additive `monthly_reports` table keeps one editable report per student and calendar month; existing students and lessons are preserved. Visit Reports, choose a student (including an archived one) and month, review the generated text, edit it, and save. Copy or download the current text as a `.txt` file. Regenerating the draft uses the latest records; saved edits stay unchanged until you explicitly save again.
+
+`GET /api/students/:id/reports/:month` returns a deterministic draft and any saved report; `PUT` at the same path saves edited text. `GET /api/students/:id/reports` lists saved months. The month is `YYYY-MM` in the lesson's Europe/London civil calendar. Completed lessons contribute session counts and recorded topics, strengths, difficulties and plans. Dated progress observations contribute evidence, needs-support areas and next actions. Cancelled and scheduled lessons are excluded; missing evidence is stated explicitly. All routes require the signed-in tutor and enforce record ownership.
+
+Dashboard values come from persisted student and lesson API responses. The notes queue lists past unlogged lessons and completed lessons without a useful recap (a topic plus at least one of strengths, difficulties, homework or next plan); the other fields remain optional. Hours include completed sessions in the current calendar month, not cancelled sessions.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 ## Learn More

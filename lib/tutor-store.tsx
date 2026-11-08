@@ -12,12 +12,13 @@ import {
   updateLesson as patchLesson,
   updateStudent as patchStudent,
 } from './api'
-import { todayISO } from './dates'
+import { londonClock, todayISO } from './dates'
 import type { Lesson, LessonInput, NewStudent, Student, SavedResource, ResourceInput } from './types'
 
 /** The Flask API is the source of truth; this context caches its responses for the UI. */
 interface TutorStore {
   today: string
+  clock: string
   students: Student[]
   lessons: Lesson[]
   resources: SavedResource[]
@@ -37,13 +38,23 @@ interface TutorStore {
 const TutorStoreContext = createContext<TutorStore | null>(null)
 
 export function TutorStoreProvider({ children }: { children: React.ReactNode }) {
-  const [today] = useState(todayISO)
+  const [today, setToday] = useState(todayISO)
+  const [clock, setClock] = useState(londonClock)
   const [students, setStudents] = useState<Student[]>([])
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [resources, setResources] = useState<SavedResource[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
+
+  // Refresh civil-day and clock-sensitive dashboard views while the tab stays open.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setToday(todayISO())
+      setClock(londonClock())
+    }, 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -107,10 +118,10 @@ export function TutorStoreProvider({ children }: { children: React.ReactNode }) 
 
   const value = useMemo(
     () => ({
-      today, students, lessons, resources, loading, loadError, reload,
+      today, clock, students, lessons, resources, loading, loadError, reload,
       getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson, addResource, updateResource,
     }),
-    [today, students, lessons, resources, loading, loadError, reload, getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson, addResource, updateResource],
+    [today, clock, students, lessons, resources, loading, loadError, reload, getStudent, getLesson, addStudent, updateStudent, addLesson, updateLesson, addResource, updateResource],
   )
 
   return <TutorStoreContext.Provider value={value}>{children}</TutorStoreContext.Provider>

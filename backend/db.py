@@ -74,10 +74,13 @@ def assert_schema_compatible(conn) -> None:
 
 
 def run_sql_script(conn, sql: str) -> None:
-    for raw in sql.split(";"):
-        statement = "\n".join(
-            line for line in raw.splitlines() if not line.strip().startswith("--")
-        ).strip()
+    # Strip full-line comments before splitting. A semicolon in a comment is
+    # not a statement delimiter.
+    uncommented = "\n".join(
+        line for line in sql.splitlines() if not line.strip().startswith("--")
+    )
+    for raw in uncommented.split(";"):
+        statement = raw.strip()
         if statement:
             conn.execute(statement)
 

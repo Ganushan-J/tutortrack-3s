@@ -122,6 +122,22 @@ CREATE TABLE IF NOT EXISTS lesson_resources (
 
 CREATE INDEX IF NOT EXISTS lesson_resources_tutor_idx ON lesson_resources (tutor_id, resource_id);
 
+-- One editable report per student and calendar month. The generated draft is
+-- rebuilt from lesson/observation records; only tutor-edited text is saved.
+CREATE TABLE IF NOT EXISTS monthly_reports (
+    student_id TEXT NOT NULL,
+    tutor_id TEXT NOT NULL,
+    month DATE NOT NULL CHECK (EXTRACT(DAY FROM month) = 1),
+    report_text TEXT NOT NULL CHECK (length(report_text) BETWEEN 1 AND 50000),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (student_id, month),
+    FOREIGN KEY (student_id, tutor_id) REFERENCES students (id, tutor_id)
+);
+
+CREATE INDEX IF NOT EXISTS monthly_reports_tutor_month_idx
+    ON monthly_reports (tutor_id, month DESC);
+
 INSERT INTO tutors (id, email)
 VALUES ('tut_local', 'tutor@localhost')
 ON CONFLICT (id) DO NOTHING;

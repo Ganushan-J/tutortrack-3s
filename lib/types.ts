@@ -29,6 +29,7 @@ export interface Student {
   nextTopic: string
   /** YYYY-MM-DD */
   createdAt: string
+  archived?: boolean
 }
 
 export interface Lesson {
@@ -76,3 +77,21 @@ export type ResourceInput = Pick<SavedResource, 'title' | 'url' | 'topic' | 'tie
 
 export type NewStudent = Omit<Student, 'id' | 'createdAt'>
 export type LessonInput = Omit<Lesson, 'id'>
+
+export interface MonthlyDraft {
+  studentId: string
+  month: string
+  completedSessions: number
+  topics: string[]
+  progressEvidence: string[]
+  areasToRevisit: string[]
+  nextMonthPriorities: string[]
+  text: string
+}
+
+export interface SavedReport {
+  studentId: string
+  month: string
+  text: string
+  updatedAt: string
+}

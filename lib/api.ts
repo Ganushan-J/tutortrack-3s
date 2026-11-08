@@ -1,4 +1,4 @@
-import type { Lesson, LessonInput, NewStudent, Student, TopicObservation, ObservationInput, SavedResource, ResourceInput } from './types'
+import type { Lesson, LessonInput, NewStudent, Student, TopicObservation, ObservationInput, SavedResource, ResourceInput, MonthlyDraft, SavedReport } from './types'
 
 // Next.js forwards same-origin /api requests to Flask so the session cookie
 // belongs to the UI origin. No database credentials or Flask URL reach JS.
@@ -52,7 +52,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-function json(method: 'POST' | 'PATCH', input: unknown): RequestInit {
+function json(method: 'POST' | 'PATCH' | 'PUT', input: unknown): RequestInit {
   return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }
 }
 
@@ -76,8 +76,8 @@ export async function signOut(): Promise<void> {
   setCsrfToken(null)
 }
 
-export async function fetchStudents(): Promise<Student[]> {
-  return (await request<{ students: Student[] }>('/api/students')).students
+export async function fetchStudents(includeArchived = false): Promise<Student[]> {
+  return (await request<{ students: Student[] }>('/api/students' + (includeArchived ? '?includeArchived=true' : ''))).students
 }
 
 export async function createStudent(input: NewStudent): Promise<Student> {
@@ -122,4 +122,16 @@ export async function createResource(input: ResourceInput): Promise<SavedResourc
 
 export async function updateResource(id: string, changes: Partial<ResourceInput>): Promise<SavedResource> {
   return (await request<{ resource: SavedResource }>('/api/resources/' + encodeURIComponent(id), json('PATCH', changes))).resource
+}
+
+function reportPath(studentId: string, month: string): string {
+  return '/api/students/' + encodeURIComponent(studentId) + '/reports/' + encodeURIComponent(month)
+}
+
+export async function fetchMonthlyReport(studentId: string, month: string): Promise<{ draft: MonthlyDraft; saved: SavedReport | null }> {
+  return request(reportPath(studentId, month))
+}
+
+export async function saveMonthlyReport(studentId: string, month: string, text: string): Promise<SavedReport> {
+  return (await request<{ report: SavedReport }>(reportPath(studentId, month), json('PUT', { text }))).report
 }

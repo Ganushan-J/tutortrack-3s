@@ -19,6 +19,7 @@ from progress_resources import (
     owned_resource_ids,
     replace_lesson_resources,
 )
+from reports import bp as reports_bp
 from validation import validate_lesson, validate_student
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
@@ -66,6 +67,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
     app.register_blueprint(progress_resources_bp)
+    app.register_blueprint(reports_bp)
 
     @app.errorhandler(RuntimeError)
     def handle_config_error(error):
