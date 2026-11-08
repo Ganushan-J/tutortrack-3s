@@ -112,6 +112,49 @@ def test_owner_scoping_hides_other_tutor_records(db_client):
     assert other.patch(f"/api/students/{student_id}", json={"targetGrade": 4}).status_code == 404
 
 
+def test_lesson_save_updates_next_topic_in_same_transaction(db_client):
+    student_id = db_client.post("/api/students", json=valid_student()).get_json()["student"]["id"]
+    created = db_client.post(
+        "/api/lessons",
+        json=valid_lesson(studentId=student_id, status="completed", nextTopic="  Fractions  "),
+    )
+    assert created.status_code == 201
+    lesson_id = created.get_json()["lesson"]["id"]
+    assert created.get_json()["student"]["nextTopic"] == "Fractions"
+    assert db_client.get(f"/api/students/{student_id}").get_json()["student"]["nextTopic"] == "Fractions"
+
+    failed = db_client.patch(
+        f"/api/lessons/{lesson_id}", json={"nextTopic": "Functions", "resourceIds": ["res_unknown"]}
+    )
+    assert failed.status_code == 400
+    assert db_client.get(f"/api/students/{student_id}").get_json()["student"]["nextTopic"] == "Fractions"
+
+    updated = db_client.patch(f"/api/lessons/{lesson_id}", json={"nextTopic": "  Functions "})
+    assert updated.status_code == 200
+    assert updated.get_json()["student"]["nextTopic"] == "Functions"
+
+    archived = db_client.post(f"/api/students/{student_id}/archive")
+    assert archived.get_json()["student"]["archived"] is True
+    history = db_client.patch(f"/api/lessons/{lesson_id}", json={"strengths": "Edited recap"})
+    assert history.status_code == 200
+    assert db_client.patch(f"/api/lessons/{lesson_id}", json={"status": "scheduled"}).status_code == 400
+
+
+def test_lesson_next_topic_cannot_update_another_tutor_student(db_client):
+    student_id = db_client.post("/api/students", json=valid_student()).get_json()["student"]["id"]
+    from app import create_app
+    from tests.conftest import AuthClient
+
+    other_app = create_app({"TESTING": True, "SECRET_KEY": "test-only-key-long-enough-for-sessions", "SESSION_COOKIE_SECURE": False})
+    other_app.test_client_class = AuthClient
+    other = other_app.test_client()
+    login = other.post("/api/auth/login", json={"email": "other@example.test", "password": "other-password-123"})
+    other.csrf_token = login.get_json()["csrfToken"]
+    blocked = other.post("/api/lessons", json=valid_lesson(studentId=student_id, nextTopic="Other's topic"))
+    assert blocked.status_code == 400
+    assert db_client.get(f"/api/students/{student_id}").get_json()["student"]["nextTopic"] == "Linear equations"
+
+
 def test_unauthenticated_requests_are_blocked(app):
     anonymous = app.test_client()
     assert anonymous.get("/api/health").status_code == 200
