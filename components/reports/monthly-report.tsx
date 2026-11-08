@@ -50,10 +50,6 @@ export function MonthlyReport() {
   useEffect(() => {
     if (!studentId || !month) return
     let active = true
-    setLoaded(null)
-    setReportError('')
-    setMessage('')
-    setReportLoading(true)
     fetchMonthlyReport(studentId, month)
       .then(({ draft, saved }) => {
         if (!active) return
@@ -70,6 +66,7 @@ export function MonthlyReport() {
   }, [studentId, month, reload, key])
 
   const current = loaded?.key === key ? loaded : null
+  const reportPending = !!studentId && (reportLoading || (!current && !reportError))
   const dirty = !!current && text !== baseline
   const selectedStudent = students.find((student) => student.id === studentId)
 
@@ -133,7 +130,7 @@ export function MonthlyReport() {
               id="report-student"
               value={studentId}
               disabled={studentsLoading || saving}
-              onChange={(event) => { if (canSwitch()) setStudentId(event.target.value) }}
+              onChange={(event) => { if (canSwitch()) { setReportError(''); setMessage(''); setStudentId(event.target.value) } }}
             >
               {students.length === 0 && <option value="">No students yet</option>}
               {students.map((student) => (
@@ -150,7 +147,7 @@ export function MonthlyReport() {
               required
               value={month}
               disabled={saving}
-              onChange={(event) => { if (canSwitch()) setMonth(event.target.value) }}
+              onChange={(event) => { if (canSwitch()) { setReportError(''); setMessage(''); setMonth(event.target.value) } }}
               className="h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </FormField>
@@ -164,11 +161,11 @@ export function MonthlyReport() {
           <EmptyState title="Add a student first" description="Monthly feedback is based on that student's lesson and progress records." />
         </SectionCard>
       )}
-      {reportLoading && <p role="status" className="mt-4 text-sm text-muted-foreground">Preparing report…</p>}
+      {reportPending && <p role="status" className="mt-4 text-sm text-muted-foreground">Preparing report…</p>}
       {reportError && (
         <div role="alert" className="mt-4 flex flex-wrap gap-3 text-sm text-destructive">
           <span>{reportError}</span>
-          {!current && <button type="button" className="underline" onClick={() => setReload((value) => value + 1)}>Retry</button>}
+          {!current && <button type="button" className="underline" onClick={() => { setReportError(''); setReportLoading(true); setReload((value) => value + 1) }}>Retry</button>}
         </div>
       )}
       {current && selectedStudent && (
