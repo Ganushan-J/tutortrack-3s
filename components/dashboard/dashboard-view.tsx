@@ -13,15 +13,15 @@ import { StatCard } from './stat-card'
 import { UpcomingLessons } from './upcoming-lessons'
 
 export function DashboardView() {
-  const { today, students, lessons, loading, loadError } = useTutorStore()
+  const { today, clock, students, lessons, loading, loadError } = useTutorStore()
 
   if (loading || loadError) return null
 
-  const upcoming = lessons.filter((l) => isUpcoming(l, today)).sort(compareLessonsAsc)
+  const upcoming = lessons.filter((l) => isUpcoming(l, today, clock)).sort(compareLessonsAsc)
   const todayCount = upcoming.filter((l) => l.date === today).length
   const weekEnd = addDays(today, 7)
   const thisWeekCount = upcoming.filter((l) => l.date < weekEnd).length
-  const pending = lessons.filter((l) => needsNotes(l, today)).sort(compareLessonsDesc)
+  const pending = lessons.filter((l) => needsNotes(l, today, clock)).sort(compareLessonsDesc)
   const monthStart = `${today.slice(0, 7)}-01`
   const hoursThisMonth =
     lessons
