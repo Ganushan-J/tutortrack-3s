@@ -51,6 +51,3 @@ export function initials(student: Pick<Student, 'firstName' | 'lastName'>): stri
   return `${student.firstName.charAt(0)}${student.lastName.charAt(0)}`.toUpperCase()
 }
 
-export function createId(prefix: string): string {
-  return `${prefix}_${crypto.randomUUID().slice(0, 8)}`
-}
