@@ -1,6 +1,7 @@
 from datetime import date
 
 from app import create_app
+from db import run_sql_script
 from reports import build_monthly_draft, month_bounds
 from tests.conftest import AuthClient
 from tests.helpers import valid_lesson, valid_student
@@ -29,6 +30,19 @@ def test_month_bounds_include_december_to_january_and_reject_invalid():
     assert month_bounds("2026-12") == (date(2026, 12, 1), date(2027, 1, 1))
     assert month_bounds("2026-13") is None
     assert month_bounds("2026-1") is None
+
+
+def test_migration_parser_ignores_semicolons_in_full_line_comments():
+    class RecordingConnection:
+        def __init__(self):
+            self.statements = []
+
+        def execute(self, statement):
+            self.statements.append(statement)
+
+    conn = RecordingConnection()
+    run_sql_script(conn, "-- Explanation; not SQL\nSELECT 1;\n-- Another; comment\nSELECT 2;")
+    assert conn.statements == ["SELECT 1", "SELECT 2"]
 
 
 def test_draft_uses_only_completed_sessions_and_dated_evidence():
