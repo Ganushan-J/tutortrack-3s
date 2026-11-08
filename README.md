@@ -1,6 +1,6 @@
 # tutortrack-3s
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+TutorTrack is a private GCSE maths tutoring dashboard. The Next.js UI calls an authenticated Flask JSON API; Flask owns access to Supabase PostgreSQL.
 
 ## Built with v0
 
@@ -54,6 +54,14 @@ Run `python migrate.py` again from `backend/` after updating. The additive `mont
 `GET /api/students/:id/reports/:month` returns a deterministic draft and any saved report; `PUT` at the same path saves edited text. `GET /api/students/:id/reports` lists saved months. The month is `YYYY-MM` in the lesson's Europe/London civil calendar. Completed lessons contribute session counts and recorded topics, strengths, difficulties and plans. Dated progress observations contribute evidence, needs-support areas and next actions. Cancelled and scheduled lessons are excluded; missing evidence is stated explicitly. All routes require the signed-in tutor and enforce record ownership.
 
 Dashboard values come from persisted student and lesson API responses. The notes queue lists past unlogged lessons and completed lessons without a useful recap (a topic plus at least one of strengths, difficulties, homework or next plan); the other fields remain optional. Hours include completed sessions in the current calendar month, not cancelled sessions.
+
+## Student and lesson maintenance
+
+Open a student profile to edit their details or archive and restore them. The directory hides archived students by default; select “Include archived students” to access their history. Archived students remain available in reports and their past lessons, but cannot be booked for new sessions. Saving a lesson and its next-topic choice happens in one database transaction, so a failed save does not leave a partial profile update.
+
+## Checks
+
+From the project root, run `pnpm lint`, `pnpm typecheck`, and `pnpm build`. The production build checks TypeScript errors. From `backend/`, run `pytest -q`. Database integration tests require a configured `DATABASE_URL`; without one pytest reports those tests as skipped. Use a development database for tests, because the fixture creates and removes an isolated schema. Run `python migrate.py` before manual checks after changing backend schema.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
