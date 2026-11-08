@@ -42,7 +42,9 @@ export function StudentList({
                   <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
                     <StudentAvatar student={student} />
                     <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-sm font-medium">{fullName(student)}</span>
+                      <span className="truncate text-sm font-medium">
+                        {fullName(student)}{student.archived && <span className="ml-2 text-xs font-normal text-muted-foreground">(archived)</span>}
+                      </span>
                       <span className="truncate text-xs text-muted-foreground">
                         {student.yearGroup} · {student.examBoard}
                       </span>
