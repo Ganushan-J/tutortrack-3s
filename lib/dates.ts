@@ -10,6 +10,16 @@ export function todayISO(): string {
   }).format(new Date())
 }
 
+/** Current 24-hour clock time in the same zone as lesson dates. */
+export function londonClock(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: UK_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date())
+}
+
 function parseISODate(iso: string): Date {
   const [year, month, day] = iso.split('-').map(Number)
   return new Date(Date.UTC(year, month - 1, day))
