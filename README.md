@@ -1,32 +1,27 @@
-# tutortrack-3s
+# TutorTrack
 
-TutorTrack is a private GCSE maths tutoring dashboard. The Next.js UI calls an authenticated Flask JSON API; Flask owns access to Supabase PostgreSQL.
+Private GCSE maths tutoring dashboard for one tutor. It stores students, lessons, topic observations, saved resource links and monthly feedback in PostgreSQL. Gemini and Slack are **planned**, not part of this release.
 
-## Built with v0
+## Architecture
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
-
-[Continue working on v0 →](https://v0.app/chat/projects/prj_Hb7TgfrQ7QoGl9IsBYkZulhMMB7L)
-
-## Getting Started
-
-The UI is Next.js. The JSON API is Flask in `backend/`; Flask is the only process that talks to Supabase PostgreSQL. Copy `backend/.env.example` to `backend/.env` and set `DATABASE_URL` there — never commit that file and never paste it into chat.
-
-Canonical API prefix: `/api`. Next.js forwards same-origin API requests to Flask using the server-only `FLASK_API_ORIGIN` setting. Flask is the sole PostgreSQL client. The session identifies the tutor; the browser never supplies an authoritative tutor ID.
-
-Vercel builds the Next.js UI only; it does not host Flask. Deploy the Flask API separately in the release package, set `FLASK_API_ORIGIN` on the Next.js host to its HTTPS origin, and use HTTPS for session cookies. Use fictional records until the full production deployment and access checks are complete.
-
-JSON arrays (`learningGoals`, `topicsCovered`, `resourceLinks`) are stored as JSONB. Lesson `date` / `startTime` are Europe/London civil values; `created_at` / `updated_at` / `archived_at` are UTC.
-
-For a fresh checkout, copy the root `.env.example` to `.env.local` and the backend example to `backend/.env`. Fill in `DATABASE_URL` and generate a random `FLASK_SECRET_KEY` locally; neither secret belongs in GitHub or chat. If you already have `backend/.env`, add the secret key without changing your working `DATABASE_URL`.
-
-Frontend (terminal 1, from project root):
-
-```bash
-pnpm dev
+```mermaid
+flowchart LR
+  B["Browser / Next.js on Vercel"] -->|"same-origin /api"| F["Flask JSON API on Render"]
+  F -->|"server-side SQL"| P["Supabase PostgreSQL"]
 ```
 
-Backend (terminal 2):
+Next.js owns the interface and proxies `/api/*` to Flask. Flask owns login, validation, record ownership, reporting and database transactions. The session cookie is HttpOnly, SameSite=Lax and Secure when `FLASK_DEBUG=0`; unsafe writes require a CSRF token. The browser never sees `DATABASE_URL` or supplies an authoritative tutor ID. Flask serves JSON only, so `/api/health` is the API check; the UI is on port 3000 locally.
+
+Lesson dates and start times are Europe/London civil values. Audit timestamps are UTC. Small ordered string lists (goals, topics and one-off links) use JSONB. Observations, saved resources, lesson attachments and monthly reports have separate tables.
+
+## Local setup
+
+Prerequisites: Node.js with npm, Python 3.13, a development Supabase PostgreSQL project and a recent pnpm. The repo pins `pnpm@12.3.4`; if `pnpm` is not on PATH, run commands with `npx --yes pnpm@12.3.4`.
+
+1. Clone the repository. From its root, run `npx --yes pnpm@12.3.4 install --frozen-lockfile`.
+2. Copy `.env.example` to `.env.local`. For local use, keep `FLASK_API_ORIGIN=http://127.0.0.1:5000`.
+3. Copy `backend/.env.example` to `backend/.env`. Fill in the Supabase PostgreSQL URI as `DATABASE_URL` and generate a random `FLASK_SECRET_KEY` using the command in the example. Keep `FLASK_DEBUG=1` for localhost. Do not commit or share either secret.
+4. In one terminal:
 
 ```bash
 cd backend
@@ -35,40 +30,63 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 python migrate.py
 python setup_tutor.py
-pytest
 python app.py
 ```
 
-Run `python setup_tutor.py` once to enter your email and a password locally (the password input is hidden). To deliberately replace it later, use `python setup_tutor.py --reset`. Open [http://127.0.0.1:5000/api/health](http://127.0.0.1:5000/api/health) to confirm Flask is running, then [http://localhost:3000](http://localhost:3000) to sign in. A direct unauthenticated API request to `/api/students` must return `401`.
+`setup_tutor.py` prompts locally for a tutor email and password; it stores only a password hash. Use `--reset` only to deliberately replace the password.
 
-## Topic progress and resources
+5. In another terminal from the project root, run `npx --yes pnpm@12.3.4 dev`. Open [http://localhost:3000](http://localhost:3000) and sign in. [http://127.0.0.1:5000/api/health](http://127.0.0.1:5000/api/health) should return `{"ok":true}`; an anonymous `/api/students` request should return 401.
 
-After updating the code, run `python migrate.py` again from `backend/`. This additive migration creates `topic_observations`, `resources`, and `lesson_resources` without deleting existing students or lessons. The student profile records dated topic observations with status, evidence and a next action; repeated observations remain in history. The Resources page stores searchable links tagged by topic and tier. Select saved links in the lesson form; `resourceIds` are validated and attached in the same database transaction as the lesson save. Existing one-off `resourceLinks` remain supported.
+## Verification and migrations
 
-All these routes use the authenticated tutor session and `/api` prefix: `GET/POST /students/:id/progress`, `PATCH /progress/:id`, `GET/POST /resources`, `PATCH /resources/:id`. Each lesson response includes `resourceIds`; create/update accepts the array. The browser never supplies `tutor_id` as authority. Use fictional records in development.
+```bash
+cd backend
+source .venv/bin/activate
+pytest -q
+```
 
-## Monthly reports and dashboard
+With `DATABASE_URL` set, database tests create and drop an isolated schema. Do not run tests against a database containing sensitive production records; use the development project. Without a database connection, integration tests skip. For WP6, the development Supabase run passed 33 tests.
 
-Run `python migrate.py` again from `backend/` after updating. The additive `monthly_reports` table keeps one editable report per student and calendar month; existing students and lessons are preserved. Visit Reports, choose a student (including an archived one) and month, review the generated text, edit it, and save. Copy or download the current text as a `.txt` file. Regenerating the draft uses the latest records; saved edits stay unchanged until you explicitly save again.
+```bash
+npx --yes pnpm@12.3.4 lint
+npx --yes pnpm@12.3.4 typecheck
+npx --yes pnpm@12.3.4 build
+```
 
-`GET /api/students/:id/reports/:month` returns a deterministic draft and any saved report; `PUT` at the same path saves edited text. `GET /api/students/:id/reports` lists saved months. The month is `YYYY-MM` in the lesson's Europe/London civil calendar. Completed lessons contribute session counts and recorded topics, strengths, difficulties and plans. Dated progress observations contribute evidence, needs-support areas and next actions. Cancelled and scheduled lessons are excluded; missing evidence is stated explicitly. All routes require the signed-in tutor and enforce record ownership.
+`backend/schema.sql` is the additive schema; `python migrate.py` applies it. Apply it once for a fresh database and again after schema updates. It uses `CREATE TABLE/INDEX IF NOT EXISTS` and additive alterations, but review changes and take a backup before applying any future destructive migration. Never run `setup_tutor.py --reset` in an unattended deploy.
 
-Dashboard values come from persisted student and lesson API responses. The notes queue lists past unlogged lessons and completed lessons without a useful recap (a topic plus at least one of strengths, difficulties, homework or next plan); the other fields remain optional. Hours include completed sessions in the current calendar month, not cancelled sessions.
+## Deployment preparation
 
-## Student and lesson maintenance
+Deployment needs a separate Flask host because Vercel builds only the Next.js frontend. Provision the database and API before merging this release: a merge to `main` automatically deploys Vercel. Render's Free web service can sleep after inactivity, so warm it before an interview or choose a paid plan deliberately. See [Render's Flask guide](https://render.com/docs/deploy-flask) and [Free plan limits](https://render.com/docs/free). Creating a Render service starts a production deployment; perform these steps only after explicit approval.
 
-Open a student profile to edit their details or archive and restore them. The directory hides archived students by default; select “Include archived students” to access their history. Archived students remain available in reports and their past lessons, but cannot be booked for new sessions. Saving a lesson and its next-topic choice happens in one database transaction, so a failed save does not leave a partial profile update.
+1. Create a dedicated production Supabase project. In a separate clean checkout for the production setup, create an ignored `backend/.env` with its `DATABASE_URL`, a stable `FLASK_SECRET_KEY`, `TUTOR_ID=tut_local` and `FLASK_DEBUG=0`. Check the Supabase project reference carefully. From that checkout's `backend/`, create the venv, install `requirements.txt`, run `python migrate.py`. In the production project's Supabase SQL Editor, apply `backend/production_access.sql` to revoke `anon`/`authenticated` table privileges and enable RLS with no public policies; Flask connects directly as the database owner. Then run `python setup_tutor.py` interactively **once**. The access script is deliberately separate so it is not applied to an existing development database by routine migrations. Remove that temporary checkout after verification. On Render Free, pre-deploy migration commands are unavailable; do not add `migrate.py` to the service start command.
+2. In Render, create a **Web Service** from this repo's reviewed `wp7-deployment-interview` branch, with root directory `backend`, Python runtime (the `backend/.python-version` file selects Python 3.13), Frankfurt region, Free plan if its idle delay is acceptable, build command `pip install -r requirements.txt`, start command `gunicorn --bind 0.0.0.0:$PORT --workers 2 app:app`, health check path `/api/health`, and automatic deploys **off**. Add the same production `DATABASE_URL` (the Supabase **session pooler** URI with SSL), `FLASK_SECRET_KEY`, `FLASK_DEBUG=0` and `TUTOR_ID=tut_local` privately in Render. Do not put secrets in GitHub, a PR, or chat.
+3. Confirm `https://<your-api>.onrender.com/api/health` returns `{"ok":true}`. Add Vercel's Production environment variable `FLASK_API_ORIGIN=https://<your-api>.onrender.com` (no trailing `/api`); this affects the next deployment, not the existing one. Then, with explicit approval, merge this PR into `main`. Vercel will build the frontend with that API origin. In Render's service settings, change its linked branch to `main` and manually deploy the reviewed merge commit so both hosts use the release code. See [Vercel environment variables](https://vercel.com/docs/environment-variables).
+4. Open the Vercel production URL in a fresh browser session. Check that sign-in and the complete fictional demo below work after refresh, sign-out blocks data, and no real student details appear in screenshots. Verify HTTPS, cookie behaviour and both deployed commits before calling the release complete.
 
-## Checks
+Environment variables:
 
-From the project root, run `pnpm lint`, `pnpm typecheck`, and `pnpm build`. The production build checks TypeScript errors. From `backend/`, run `pytest -q`. Database integration tests require a configured `DATABASE_URL`; without one pytest reports those tests as skipped. Use a development database for tests, because the fixture creates and removes an isolated schema. Run `python migrate.py` before manual checks after changing backend schema.
+| Location | Name | Purpose |
+| --- | --- | --- |
+| Flask / Render | `DATABASE_URL` | Server-only Supabase PostgreSQL URI with `sslmode=require`; secret. |
+| Flask / Render | `FLASK_SECRET_KEY` | Stable random secret, at least 32 characters; secret. Changing it invalidates sessions. |
+| Flask / Render | `FLASK_DEBUG` | `0` in production for Secure cookies and disabled debugger; `1` locally only. |
+| Flask / Render | `TUTOR_ID` | First account ID for setup (default `tut_local`); session controls API ownership. |
+| Flask / local | `PORT` | Local Flask port (default 5000); Render sets this automatically. |
+| Next.js / Vercel | `FLASK_API_ORIGIN` | Server-only HTTPS origin for the Flask API; never a browser `NEXT_PUBLIC_*` secret. |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Fictional demonstration (3–5 minutes)
 
-## Learn More
+1. Sign in as the account you created. Add **Alex Taylor**, Year 11, Higher, with an algebra goal and `Linear equations` as the next topic. Refresh to show persistence.
+2. Schedule Alex a lesson. Mark it completed with topics, a strength, a difficulty, homework and a next plan. Add a saved algebra resource and attach it to the lesson. Show the real dashboard totals.
+3. Record two dated observations of the same topic, `needs support` and then `developing`, with distinct evidence and next actions. Both stay in history.
+4. Select Alex and a month with completed lessons in Reports. Edit, save, refresh, then copy or download the report. Point out that missing evidence is disclosed, not invented.
+5. Archive and restore Alex, then sign out and check that a direct student page/API request cannot reveal records.
 
-To learn more, take a look at the following resources:
+Capture screenshots from this fictional-data flow for your portfolio only after the live deployment has passed; no production screenshots are claimed yet.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+## Known limits
+
+One tutor account is configured interactively; there are no parent/student accounts, automated emails, file uploads, PDF reports, AI generation or Slack reminders. The free Render service can sleep. The API health endpoint tests the process, not database availability. There is no hosted production verification until the deployment steps above are completed.
+
+See [docs/INTERVIEW.md](docs/INTERVIEW.md) for a concise architecture explanation, a real bug and fix, and truthful CV phrasing.
